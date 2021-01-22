@@ -2,10 +2,11 @@ package main
 
 import (
 	// 路径自动替换
-
 	"fmt"
 	"io/ioutil"
 	"reflect"
+
+	model "git.dustess.com/mk-biz/mk-pay-svc/pkg/order/model"
 )
 
 type fieldTag struct {
@@ -83,9 +84,9 @@ func format(tabName string, tabPrefix string, tagPrefix string, m map[string]fie
 
 func main() {
 	// 包名自动替换
-	fileBuf := "package \n"
+	fileBuf := "package model\n"
 	// 表名自动替换
-	var tabs = []interface{}{}
+	var tabs = []interface{}{model.Order{}}
 	allTagStr := "func init() {\n"
 	fnBuf := fmt.Sprintln("var FN = struct {")
 	for _, tab := range tabs {
@@ -105,5 +106,5 @@ func main() {
 	fileBuf += allTagStr
 
 	// 路径自动替换
-	ioutil.WriteFile("C:\\work\\go/src/analyse/exam/auto_tag.go", []byte(fileBuf), 0644)
+	ioutil.WriteFile("C:\\work\\go/src/mk-pay-svc/pkg/order/model/auto_tag.go", []byte(fileBuf), 0644)
 }

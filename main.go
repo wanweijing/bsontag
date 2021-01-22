@@ -154,21 +154,31 @@ func parseTabImpl(text string) []string {
 	return tabs
 }
 
-func parseTabs(dir string) ([]string, string) {
+type packInfo struct {
+	pkgName string
+	tabs    []string
+}
+
+func parseTabs(parent string) []packInfo {
 	gopath := os.Getenv("GOPATH")
 	gopath = strings.Replace(gopath, "\\", "\\\\", -1)
-	dir = gopath + "/src/" + dir
-	fileinfo, err := ioutil.ReadDir(dir)
+	// dir = gopath + "/src/" + dir
+	fileinfo, err := ioutil.ReadDir(parent)
 	if err != nil {
 		panic(err)
 	}
+
+	var pInfo []packInfo
 
 	var tabs []string
 	pkgName := ""
 	for _, fi := range fileinfo {
 		if !fi.IsDir() {
 			// files = append(files, fi.Name())
-			buf, err := ioutil.ReadFile(dir + "/" + fi.Name())
+			if fi.Name() == "order.go" {
+				fmt.Println(1)
+			}
+			buf, err := ioutil.ReadFile(parent + "/" + fi.Name())
 			if err != nil {
 				panic("读取" + fi.Name() + "文件失败，终止生成tag")
 			}
@@ -177,11 +187,21 @@ func parseTabs(dir string) ([]string, string) {
 				a := regexp.MustCompile(`package\s+(\w+)\s+`)
 				f := a.FindAllStringSubmatch(string(buf), -1)
 				pkgName = f[0][1]
+				pkgName = strings.TrimPrefix(parent, os.Getenv("GOPATH")+"/src/")
+			}
+		} else {
+			if temp := parseTabs(parent + "/" + fi.Name()); len(temp) > 0 {
+				pInfo = append(pInfo, temp...)
 			}
 		}
 	}
 
-	return tabs, pkgName
+	pInfo = append(pInfo, packInfo{
+		pkgName: pkgName,
+		tabs:    tabs,
+	})
+
+	return pInfo
 }
 
 func main() {
@@ -196,10 +216,21 @@ func main() {
 
 	modelDir := os.Args[1]
 	// 分析指定包中有几张表，返回表名和包名
-	tabs, pkgName := parseTabs(modelDir)
-	fmt.Println(tabs, pkgName)
+	// tabs, pkgName := parseTabs(modelDir)
+	modelDir = os.Getenv("GOPATH") + "/src/" + modelDir
+	pInfo := parseTabs(modelDir)
+	for _, v := range pInfo {
+		if len(v.tabs) > 0 {
+			fmt.Println(v.pkgName, v.tabs)
+		}
+	}
 	// 自动生成源码
-	autoGenCode("bsontag/exam", pkgName, tabs)
+	for _, v := range pInfo {
+		if len(v.tabs) > 0 {
+			temps := strings.Split(v.pkgName, "/")
+			autoGenCode(v.pkgName, temps[len(temps)-1], v.tabs)
+		}
+	}
 
 	// 运行源码，反射得到每个字段的tag
 
