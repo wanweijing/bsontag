@@ -1,10 +1,12 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -302,17 +304,52 @@ func parseTabs(parent string) []packInfo {
 	return pInfo
 }
 
-func main() {
-	// t := reflect.TypeOf(nil)
-	os.Args = append(os.Args, "mk-pay-svc/pkg")
-
-	// 扫描model目录(model目录 先通过命令行参数传入，后面再做自动扫描)
-	if len(os.Args) < 2 {
-		fmt.Println("请输入model目录(相对于GOPATH)")
-		os.Exit(1)
+func env(dir string) string {
+	workDir, _ := os.Getwd()
+	if dir != "" {
+		workDir = workDir + "/" + dir
 	}
 
-	modelDir := os.Args[1]
+	workDir, err := filepath.Abs(workDir)
+	if err != nil {
+		fmt.Println("目录不存在, err = ", err)
+		return ""
+	}
+
+	workDir = strings.ReplaceAll(workDir, "\\", "/")
+	// cc, err2 := filepath.Rel(workDir+"/exam", "C:/work/go/bin")
+	// fmt.Println(err2, cc)
+
+	fmt.Printf("开始搜寻当前目录(%v)...\n", workDir)
+	// if !strings.HasPrefix(workDir, getGoPath()) {
+	// 	fmt.Println("被扫描目录不在GOPATH下，终止运行")
+	// 	return ""
+	// }
+
+	if !strings.HasSuffix(workDir, "/pkg") {
+		fmt.Println("当前目录不在pkg目录，终止运行")
+		return ""
+	}
+
+	diff, err := filepath.Rel(getGoPath()+"/src", workDir)
+	if err != nil {
+		fmt.Println(err)
+		return ""
+	}
+
+	return strings.ReplaceAll(diff, "\\", "/")
+}
+
+func main() {
+	dir := flag.String("d", "", "请输入pkg目录，例如mk-pay-svc/pkg、 ./pkg")
+	flag.Parse()
+	pkg := env(*dir)
+	if pkg == "" {
+		return
+	}
+
+	fmt.Printf("开始解析%v目录下的model子目录\n", pkg)
+	modelDir := pkg
 	// 分析指定包中有几张表，返回表名和包名
 	// tabs, pkgName := parseTabs(modelDir)
 	modelDir = os.Getenv("GOPATH") + "/src/" + modelDir
