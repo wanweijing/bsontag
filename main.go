@@ -15,8 +15,8 @@ func getGoPath() string {
 
 func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 	workDir := getGoPath() + "/src/bsontagtemp"
-	os.RemoveAll(workDir)
-	os.MkdirAll(workDir, 0644)
+	// os.RemoveAll(workDir)
+	// os.MkdirAll(workDir, 0644)
 
 	modName := strings.Split(pkgDir, "/")[0]
 
@@ -40,6 +40,7 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 		// 路径自动替换
 		model "PKG-DIR"
 		"fmt"
+		"os/exec"
 		"io/ioutil"
 		"reflect"
 	)
@@ -142,6 +143,11 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 	
 		// 路径自动替换
 		ioutil.WriteFile("FILE-DIR", []byte(fileBuf), 0644)
+
+		// 格式化
+		cmd := exec.Command("go", "fmt", "FILE-DIR")
+		cmd.Start()
+		cmd.Wait()
 	}
 	`
 
@@ -162,17 +168,28 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 }
 
 func parseTabImpl(text string) []string {
-	eee := strings.Replace(text, "\r\n", "abcdefg", -1)
-	reg1 := regexp.MustCompile(`// @table:(\w*)abcdefgtype (\w+) struct {`)
-	kkk := reg1.FindAllString(eee, -1)
+
+	t := make(map[string]bool)
+	flag := []string{"\n", "\r\n"}
+	for _, v := range flag {
+		eee := strings.Replace(text, v, "abcdefg", -1)
+		reg1 := regexp.MustCompile(`// @table:(\w*)abcdefgtype (\w+) struct {`)
+		kkk := reg1.FindAllString(eee, -1)
+
+		// var tabs []string
+		for _, v := range kkk {
+			a := regexp.MustCompile(`type\s+(\w+)\s+struct`)
+			f := a.FindAllStringSubmatch(v, -1)
+			for _, x := range f {
+				// tabs = append(tabs, x[1])
+				t[x[1]] = true
+			}
+		}
+	}
 
 	var tabs []string
-	for _, v := range kkk {
-		a := regexp.MustCompile(`type\s+(\w+)\s+struct`)
-		f := a.FindAllStringSubmatch(v, -1)
-		for _, x := range f {
-			tabs = append(tabs, x[1])
-		}
+	for k := range t {
+		tabs = append(tabs, k)
 	}
 
 	return tabs
@@ -184,8 +201,8 @@ type packInfo struct {
 }
 
 func parseTabs(parent string) []packInfo {
-	// gopath := os.Getenv("GOPATH")
-	// gopath = strings.Replace(gopath, "\\", "\\\\", -1)
+	gopath := os.Getenv("GOPATH")
+	gopath = strings.Replace(gopath, "\\", "\\\\", -1)
 	// dir = gopath + "/src/" + dir
 	fileinfo, err := ioutil.ReadDir(parent)
 	if err != nil {
@@ -243,12 +260,23 @@ func main() {
 	// tabs, pkgName := parseTabs(modelDir)
 	modelDir = os.Getenv("GOPATH") + "/src/" + modelDir
 	pInfo := parseTabs(modelDir)
+	hasTabs := false
 	for _, v := range pInfo {
 		if len(v.tabs) > 0 {
+			hasTabs = true
 			fmt.Println(v.pkgName, v.tabs)
 		}
 	}
+
+	if !hasTabs {
+		return
+	}
+
 	// 自动生成源码
+	workDir := getGoPath() + "/src/bsontagtemp"
+	os.RemoveAll(workDir)
+	os.MkdirAll(workDir, 0644)
+
 	for _, v := range pInfo {
 		if len(v.tabs) > 0 {
 			temps := strings.Split(v.pkgName, "/")
