@@ -8,9 +8,31 @@ import (
 	"strings"
 )
 
+func getGoPath() string {
+	temp := os.Getenv("GOPATH")
+	return strings.ReplaceAll(temp, "\\", "/")
+}
+
 func autoGenCode(pkgDir string, pkgName string, tabs []string) {
-	os.RemoveAll("./temp2")
-	os.MkdirAll("./temp2", 0644)
+	workDir := getGoPath() + "/src/bsontagtemp"
+	os.RemoveAll(workDir)
+	os.MkdirAll(workDir, 0644)
+
+	modName := strings.Split(pkgDir, "/")[0]
+
+	// go mod 文件
+	modBuf := fmt.Sprintf(`module bsontagtemp
+
+	go 1.13
+	
+	require git.dustess.com/mk-biz/%v latest
+	
+	replace git.dustess.com/mk-biz/%v => %v/src/%v
+	`, modName, modName, getGoPath(), modName)
+
+	ioutil.WriteFile(workDir+"/go.mod", []byte(modBuf), 0644)
+	// os.RemoveAll("./temp2")
+	// os.MkdirAll("./temp2", 0644)
 
 	fileBuf := `package main
 
@@ -123,18 +145,20 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 	}
 	`
 
-	fileBuf = strings.Replace(fileBuf, "PKG-DIR", pkgDir, -1)
+	fileBuf = strings.Replace(fileBuf, "PKG-DIR", "git.dustess.com/mk-biz/"+pkgDir, -1)
 	fileBuf = strings.Replace(fileBuf, "PKG-NAME", pkgName, -1)
 	for k, _ := range tabs {
 		tabs[k] = "model." + tabs[k] + "{}"
 	}
 	fileBuf = strings.Replace(fileBuf, "TABS-NAME", strings.Join(tabs, ", "), -1)
-	gopath := os.Getenv("GOPATH")
-	gopath = strings.Replace(gopath, "\\", "\\\\", -1)
-	fileDir := gopath + "/src/" + pkgDir + "/auto_tag.go"
+	// gopath := os.Getenv("GOPATH")
+	// gopath = strings.Replace(gopath, "\\", "\\\\", -1)
+	fileDir := getGoPath() + "/src/" + pkgDir + "/auto_tag.go"
 	fileBuf = strings.Replace(fileBuf, "FILE-DIR", fileDir, -1)
-	err := ioutil.WriteFile("./temp2/main.go", []byte(fileBuf), 0644)
+	os.MkdirAll(workDir+"/"+pkgDir, 0644)
+	err := ioutil.WriteFile(workDir+"/"+pkgDir+"/main.go", []byte(fileBuf), 0644)
 	fmt.Println(err)
+
 }
 
 func parseTabImpl(text string) []string {
@@ -160,8 +184,8 @@ type packInfo struct {
 }
 
 func parseTabs(parent string) []packInfo {
-	gopath := os.Getenv("GOPATH")
-	gopath = strings.Replace(gopath, "\\", "\\\\", -1)
+	// gopath := os.Getenv("GOPATH")
+	// gopath = strings.Replace(gopath, "\\", "\\\\", -1)
 	// dir = gopath + "/src/" + dir
 	fileinfo, err := ioutil.ReadDir(parent)
 	if err != nil {

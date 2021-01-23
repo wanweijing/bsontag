@@ -2,10 +2,11 @@ package main
 
 import (
 	// 路径自动替换
-	model "bsontag/exam"
 	"fmt"
 	"io/ioutil"
 	"reflect"
+
+	model "github.com/wanweijing/bsontag/exam"
 )
 
 type fieldTag struct {
