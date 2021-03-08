@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func getGoPath() string {
@@ -16,7 +18,7 @@ func getGoPath() string {
 	return strings.ReplaceAll(temp, "\\", "/")
 }
 
-func autoGenCode(pkgDir string, pkgName string, tabs []string) {
+func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 	workDir := getGoPath() + "/src/bsontagtemp"
 	// os.RemoveAll(workDir)
 	// os.MkdirAll(workDir, 0644)
@@ -212,21 +214,14 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 	fileDir := getGoPath() + "/src/" + pkgDir + "/auto_tag.go"
 	fileBuf = strings.Replace(fileBuf, "FILE-DIR", fileDir, -1)
 	os.MkdirAll(workDir+"/"+pkgDir, 0644)
-	err := ioutil.WriteFile(workDir+"/"+pkgDir+"/main.go", []byte(fileBuf), 0644)
-	fmt.Println(err)
-
-	// 运行生成的main.go
-	cmd := exec.Command("go", "run", workDir+"/"+pkgDir+"/main.go")
-	cmd.Dir = workDir + "/" + pkgDir
-	if err := cmd.Start(); err != nil {
-		fmt.Printf("运行main.go失败, err = %v, file = %v\n", err, workDir+"/"+pkgDir+"/main.go")
-		return
+	if err := ioutil.WriteFile(workDir+"/"+pkgDir+"/main.go", []byte(fileBuf), 0644); err != nil {
+		fmt.Println(workDir+"/"+pkgDir+"/main.go写入失败, err = ", err)
+	} else {
+		fmt.Println(workDir + "/" + pkgDir + "/main.go成功写入")
 	}
 
-	if err := cmd.Wait(); err != nil {
-		fmt.Printf("运行main.go失败-2, err = %v, file = %v\n", err, workDir+"/"+pkgDir+"/main.go")
-		return
-	}
+	return workDir + "/" + pkgDir + "/main.go"
+
 }
 
 func parseTabImpl(text string) []string {
@@ -374,14 +369,62 @@ func main() {
 	os.RemoveAll(workDir)
 	os.MkdirAll(workDir, 0644)
 
+	var mainFiles []string
 	for _, v := range pInfo {
 		if len(v.tabs) > 0 {
 			temps := strings.Split(v.pkgName, "/")
-			autoGenCode(v.pkgName, temps[len(temps)-1], v.tabs)
+			if mainFile := autoGenCode(v.pkgName, temps[len(temps)-1], v.tabs); mainFile != "" {
+				mainFiles = append(mainFiles, mainFile)
+			}
 		}
 	}
 
-	// 运行源码，反射得到每个字段的tag
+	// 运行源码，反射得到每个字段的tag，运行策略：先单独运行第一个main.go，之后并发运行所有的main.go
+	fn := func(mainFile string) error {
+		fmt.Printf("开始运行%v...\n", mainFile)
+		cmd := exec.Command("go", "run", mainFile)
+		cmd.Dir = strings.TrimSuffix(mainFile, "/main.go")
+		if err := cmd.Start(); err != nil {
+			fmt.Printf("运行main.go失败, err = %v, file = %v\n", err, mainFile)
+			return err
+		}
+
+		if err := cmd.Wait(); err != nil {
+			fmt.Printf("运行main.go失败-2, err = %v, file = %v\n", err, mainFile)
+			return err
+		}
+
+		fmt.Println(mainFile, "成功运行")
+
+		return nil
+	}
+
+	if len(mainFiles) > 0 {
+		fn(mainFiles[0])
+
+		var wg errgroup.Group
+		for _, v := range mainFiles[1:] {
+			func(file string) {
+				wg.Go(func() error {
+					return fn(file)
+				})
+			}(v)
+		}
+		// for _, act := range uaList {
+		// 	func(a *vs.GroupWXClueActivity) {
+		// 		wg.Go(func() error {
+		// 			if err := loadClueSubActivityDetail(ctx.Request.Context(), a, session.Account, session.AccountDB); err != nil {
+		// 				return err
+		// 			}
+		// 			return nil
+		// 		})
+		// 	}(act)
+		// }
+		if err := wg.Wait(); err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
 
 	// 生成tag源码
 
