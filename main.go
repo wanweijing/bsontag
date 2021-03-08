@@ -46,6 +46,7 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 		"os/exec"
 		"io/ioutil"
 		"reflect"
+		"strings"
 	)
 	
 	type fieldTag struct {
@@ -86,6 +87,8 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 				if bson == "" || bson == "-" {
 					continue
 				}
+
+				bson = strings.TrimSuffix(bson, ",omitempty")
 	
 				if isBaseType(objType.Field(i).Type) {
 					temp := fieldTag{
@@ -216,12 +219,12 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) {
 	cmd := exec.Command("go", "run", workDir+"/"+pkgDir+"/main.go")
 	cmd.Dir = workDir + "/" + pkgDir
 	if err := cmd.Start(); err != nil {
-		fmt.Println("运行main.go失败, err = %v, file = %v", err, workDir+"/"+pkgDir+"/main.go")
+		fmt.Printf("运行main.go失败, err = %v, file = %v\n", err, workDir+"/"+pkgDir+"/main.go")
 		return
 	}
 
 	if err := cmd.Wait(); err != nil {
-		fmt.Println("运行main.go失败-2, err = %v, file = %v", err, workDir+"/"+pkgDir+"/main.go")
+		fmt.Printf("运行main.go失败-2, err = %v, file = %v\n", err, workDir+"/"+pkgDir+"/main.go")
 		return
 	}
 }
