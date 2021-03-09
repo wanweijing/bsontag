@@ -34,10 +34,10 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 
 	go 1.13
 	
-	require git.dustess.com/mk-biz/%v latest
+	require git.dustess.com/mk-%v/%v latest
 	
-	replace git.dustess.com/mk-biz/%v => %v/src/%v
-	`, modName, modName, getGoPath(), modName)
+	replace git.dustess.com/mk-%v/%v => %v/src/%v
+	`, gitGroup, modName, gitGroup, modName, getGoPath(), modName)
 
 	ioutil.WriteFile(workDir+"/go.mod", []byte(modBuf), 0644)
 	// os.RemoveAll("./temp2")
@@ -207,7 +207,7 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 	}
 	`
 
-	fileBuf = strings.Replace(fileBuf, "PKG-DIR", "git.dustess.com/mk-biz/"+pkgDir, -1)
+	fileBuf = strings.Replace(fileBuf, "PKG-DIR", "git.dustess.com/mk-"+gitGroup+"/"+pkgDir, -1)
 	fileBuf = strings.Replace(fileBuf, "PKG-NAME", pkgName, -1)
 	for k, _ := range tabs {
 		tabs[k] = "model." + tabs[k] + "{}"
