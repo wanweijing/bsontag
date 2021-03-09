@@ -24,6 +24,10 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 	// os.MkdirAll(workDir, 0644)
 
 	modName := strings.Split(pkgDir, "/")[0]
+	gitGroup := "biz"
+	if pkgDir == "pkg" {
+		gitGroup = "base"
+	}
 
 	// go mod 文件
 	modBuf := fmt.Sprintf(`module bsontagtemp
@@ -272,10 +276,10 @@ func parseTabs(parent string) []packInfo {
 	pkgName := ""
 	for _, fi := range fileinfo {
 		if !fi.IsDir() {
-			// files = append(files, fi.Name())
-			if fi.Name() == "order.go" {
-				fmt.Println(1)
+			if !strings.HasSuffix(fi.Name(), ".go") {
+				continue
 			}
+
 			buf, err := ioutil.ReadFile(parent + "/" + fi.Name())
 			if err != nil {
 				panic("读取" + fi.Name() + "文件失败，终止生成tag")
@@ -288,6 +292,10 @@ func parseTabs(parent string) []packInfo {
 				pkgName = strings.TrimPrefix(parent, os.Getenv("GOPATH")+"/src/")
 			}
 		} else {
+			if strings.HasPrefix(fi.Name(), ".") {
+				continue
+			}
+
 			if temp := parseTabs(parent + "/" + fi.Name()); len(temp) > 0 {
 				pInfo = append(pInfo, temp...)
 			}
