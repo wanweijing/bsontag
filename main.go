@@ -63,9 +63,9 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 	
 	// 返回<字段名、tag>
 	func parseTag(obj interface{}) []fieldTag {
-		return parseTagImpl(reflect.TypeOf(obj), reflect.ValueOf(obj))
+		return parseTagImpl(reflect.TypeOf(obj))
 	}
-
+	
 	func isBaseType(objType reflect.Type) bool {
 		if objType.Kind() == reflect.Ptr {
 			return isBaseType(objType.Elem())
@@ -80,20 +80,19 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 		}
 	}
 	
-	func parseTagImpl(objType reflect.Type, objValue reflect.Value) []fieldTag {
+	func parseTagImpl(objType reflect.Type) []fieldTag {
 		if objType.Kind() == reflect.Ptr {
-			return parseTagImpl(objType.Elem(), objValue)
+			return parseTagImpl(objType.Elem())
 		}
 	
 		var fieldTags []fieldTag
-		fmt.Println(objType.Name(), objType.Kind(), objValue.Kind())
 		if objType.Kind() == reflect.Struct {
 			for i := 0; i < objType.NumField(); i++ {
 				bson := objType.Field(i).Tag.Get("bson")
 				if bson == "" || bson == "-" {
 					continue
 				}
-
+	
 				bson = strings.TrimSuffix(bson, ",omitempty")
 	
 				if isBaseType(objType.Field(i).Type) {
@@ -106,7 +105,7 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 					continue
 				}
 	
-				if temps := parseTagImpl(objType.Field(i).Type, objValue.Field(i)); len(temps) > 0 {
+				if temps := parseTagImpl(objType.Field(i).Type); len(temps) > 0 {
 	
 					if bson == ",inline" {
 						fieldTags = append(fieldTags, temps...)
@@ -134,51 +133,51 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 	// 返回：(结构体结构、赋值)
 	func format(tabName string, tabPrefix string, tagPrefix string, fieldTags []fieldTag) (string, string) {
 		structStr := fmt.Sprintf(tabName + " struct {\n")
-	tagStr := ""
-
-	for _, v := range fieldTags {
-		if len(v.subField) > 0 {
-			newPrefix := tabName
-			if tabPrefix != "" {
-				newPrefix = tabPrefix + "." + newPrefix
-			}
-
-			newTagPrefix := v.tagName
-			if tagPrefix != "" {
-				newTagPrefix = tagPrefix + "." + newTagPrefix
-			}
-
-			temp1, temp2 := format(v.fieldName, newPrefix, newTagPrefix, v.subField)
-			structStr += temp1
-			tagStr += temp2
-		} else {
-			structStr += fmt.Sprintf("%v string\n", v.fieldName)
-			fullTags := v.tagName
-			if tagPrefix != "" {
-				fullTags = tagPrefix + "." + fullTags
-			}
-			if tabPrefix == "" {
-				tagStr += fmt.Sprintf("FN.%v.%v = \"%v\"\n", tabName, v.fieldName, fullTags)
+		tagStr := ""
+	
+		for _, v := range fieldTags {
+			if len(v.subField) > 0 {
+				newPrefix := tabName
+				if tabPrefix != "" {
+					newPrefix = tabPrefix + "." + newPrefix
+				}
+	
+				newTagPrefix := v.tagName
+				if tagPrefix != "" {
+					newTagPrefix = tagPrefix + "." + newTagPrefix
+				}
+	
+				temp1, temp2 := format(v.fieldName, newPrefix, newTagPrefix, v.subField)
+				structStr += temp1
+				tagStr += temp2
 			} else {
-				tagStr += fmt.Sprintf("FN.%v.%v.%v = \"%v\"\n", tabPrefix, tabName, v.fieldName, fullTags)
+				structStr += fmt.Sprintf("%v string\n", v.fieldName)
+				fullTags := v.tagName
+				if tagPrefix != "" {
+					fullTags = tagPrefix + "." + fullTags
+				}
+				if tabPrefix == "" {
+					tagStr += fmt.Sprintf("FN.%v.%v = \"%v\"\n", tabName, v.fieldName, fullTags)
+				} else {
+					tagStr += fmt.Sprintf("FN.%v.%v.%v = \"%v\"\n", tabPrefix, tabName, v.fieldName, fullTags)
+				}
 			}
 		}
-	}
-
-	structStr += "}\n"
-
-	return structStr, tagStr
+	
+		structStr += "}\n"
+	
+		return structStr, tagStr
 	}
 	
 	func main() {
 		// 包名自动替换
-		fileBuf := "package PKG-NAME\n"
-
+		fileBuf := "package pkg\n"
+	
 		fileBuf += "/* ------此文件为自动生成，不要更改---------\n---------此文件为自动生成，不要更改----------\n---------此文件为自动生成，不要更改----------*/"
 		fileBuf += "\n\n"
-
+	
 		// 表名自动替换
-		var tabs = []interface{}{TABS-NAME}
+		var tabs = []interface{}{model.ShareActionInfo{}, model.WxClueActDetailModel{}}
 		allTagStr := "func init() {\n"
 		fnBuf := fmt.Sprintln("var FN = struct {")
 		for _, tab := range tabs {
@@ -198,10 +197,10 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 		fileBuf += allTagStr
 	
 		// 路径自动替换
-		ioutil.WriteFile("FILE-DIR", []byte(fileBuf), 0644)
-
+		ioutil.WriteFile("C:/work/go/src/pkg/auto_tag.go", []byte(fileBuf), 0644)
+	
 		// 格式化
-		cmd := exec.Command("go", "fmt", "FILE-DIR")
+		cmd := exec.Command("go", "fmt", "C:/work/go/src/pkg/auto_tag.go")
 		cmd.Start()
 		cmd.Wait()
 	}
