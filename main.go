@@ -53,6 +53,7 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 		"io/ioutil"
 		"reflect"
 		"strings"
+		"os"
 	)
 	
 	type fieldTag struct {
@@ -112,7 +113,7 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 					} else {
 						myself := fieldTag{
 							tagName:   bson,
-							fieldName: "_" + objType.Field(i).Name,
+							fieldName: objType.Field(i).Name + "_",
 						}
 						fieldTags = append(fieldTags, myself)
 	
