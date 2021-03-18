@@ -34,10 +34,15 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 
 	go 1.13
 	
-	require git.dustess.com/mk-%v/%v latest
+	require (
+		git.dustess.com/mk-%v/%v latest
+		git.dustess.com/mk-base/pkg v1.0.8-0.20210312022455-297123de89af
+	)
+	
 	
 	replace git.dustess.com/mk-%v/%v => %v/src/%v
-	`, gitGroup, modName, gitGroup, modName, getGoPath(), modName)
+	replace git.dustess.com/mk-base/pkg => %v/src/pkg
+	`, gitGroup, modName, gitGroup, modName, getGoPath(), modName, getGoPath())
 
 	ioutil.WriteFile(workDir+"/go.mod", []byte(modBuf), 0644)
 	// os.RemoveAll("./temp2")
