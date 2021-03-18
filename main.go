@@ -168,22 +168,43 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 	
 		return structStr, tagStr
 	}
+
+	func checkFieldTag(tags []fieldTag) bool {
+		for i, tag1 := range tags {
+			if !checkFieldTag(tag1.subField) {
+				return false
+			}
+	
+			for _, tag2 := range tags[i+1:] {
+				if tag1.fieldName == tag2.fieldName {
+					fmt.Printf("检测到冲突, field name = %v, tag name = %v\n", tag1.fieldName, tag1.tagName)
+					return false
+				}
+			}
+		}
+	
+		return true
+	}
 	
 	func main() {
 		// 包名自动替换
-		fileBuf := "package pkg\n"
+		fileBuf := "package PKG-NAME\n"
 	
 		fileBuf += "/* ------此文件为自动生成，不要更改---------\n---------此文件为自动生成，不要更改----------\n---------此文件为自动生成，不要更改----------*/"
 		fileBuf += "\n\n"
 	
 		// 表名自动替换
-		var tabs = []interface{}{model.ShareActionInfo{}, model.WxClueActDetailModel{}}
+		var tabs = []interface{}{TABS-NAME}
 		allTagStr := "func init() {\n"
 		fnBuf := fmt.Sprintln("var FN = struct {")
 		for _, tab := range tabs {
 			tabName := reflect.TypeOf(tab).Name()
 			fileBuf += "type tag"
 			m := parseTag(tab)
+			if !checkFieldTag(m) {
+				fmt.Println("检测到字段冲突，终止生成tag")
+				os.Exit(3)
+			}
 			structStr, tagStr := format(tabName, "", "", m)
 			fileBuf += structStr
 			allTagStr += tagStr
@@ -197,10 +218,10 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 		fileBuf += allTagStr
 	
 		// 路径自动替换
-		ioutil.WriteFile("C:/work/go/src/pkg/auto_tag.go", []byte(fileBuf), 0644)
+		ioutil.WriteFile("FILE-DIR", []byte(fileBuf), 0644)
 	
 		// 格式化
-		cmd := exec.Command("go", "fmt", "C:/work/go/src/pkg/auto_tag.go")
+		cmd := exec.Command("go", "fmt", "FILE-DIR")
 		cmd.Start()
 		cmd.Wait()
 	}
