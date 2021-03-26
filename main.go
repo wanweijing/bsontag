@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -418,13 +419,17 @@ func main() {
 		fmt.Printf("开始运行%v...\n", mainFile)
 		cmd := exec.Command("go", "run", mainFile)
 		cmd.Dir = strings.TrimSuffix(mainFile, "/main.go")
+		var stderr bytes.Buffer
+		var stdout bytes.Buffer
+		cmd.Stderr = &stderr
+		cmd.Stdout = &stdout
 		if err := cmd.Start(); err != nil {
-			fmt.Printf("运行main.go失败, err = %v, file = %v\n", err, mainFile)
+			fmt.Printf("运行main.go失败, err = %v, file = %v, 失败原因 = %v\n", err, mainFile, stderr.String())
 			return err
 		}
 
 		if err := cmd.Wait(); err != nil {
-			fmt.Printf("运行main.go失败-2, err = %v, file = %v\n", err, mainFile)
+			fmt.Printf("运行main.go失败, err = %v, file = %v, 失败原因 = %v\n", err, mainFile, stderr.String())
 			return err
 		}
 
