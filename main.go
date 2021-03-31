@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"go/build"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -14,9 +15,49 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// var g_deptInfos = make(map[string]string)
+
 func getGoPath() string {
 	temp := os.Getenv("GOPATH")
 	return strings.ReplaceAll(temp, "\\", "/")
+}
+
+func writeModFile(pkgDir string) {
+	workDir := getGoPath() + "/src/bsontagtemp"
+	// modName := strings.Split(pkgDir, "/")[0]
+	// gitGroup := "biz"
+	// if pkgDir == "pkg" {
+	// 	gitGroup = "base"
+	// }
+
+	// go mod 文件
+	modBuf := fmt.Sprintf(`module bsontagtemp
+
+	go 1.13
+	
+	`)
+
+	require := ""
+	replace := ""
+	deptPkgs := getDeptInfo(pkgDir)
+	fmt.Println("依赖探测 ->", deptPkgs)
+	for k, v := range deptPkgs {
+		if strings.HasPrefix(v, "v") {
+			require += fmt.Sprintln("require " + k + " " + v)
+		} else {
+			require += fmt.Sprintln("require " + k + " latest")
+			replace += fmt.Sprintln("replace " + k + " => " + v)
+		}
+	}
+
+	if require != "" {
+		modBuf += fmt.Sprintln(require)
+	}
+	if replace != "" {
+		modBuf += fmt.Sprintln(replace)
+	}
+
+	ioutil.WriteFile(workDir+"/go.mod", []byte(modBuf), 0777)
 }
 
 func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
@@ -24,28 +65,27 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 	// os.RemoveAll(workDir)
 	// os.MkdirAll(workDir, 0644)
 
-	modName := strings.Split(pkgDir, "/")[0]
+	// modName := strings.Split(pkgDir, "/")[0]
 	gitGroup := "biz"
 	if pkgDir == "pkg" {
 		gitGroup = "base"
 	}
 
 	// go mod 文件
-	modBuf := fmt.Sprintf(`module bsontagtemp
+	//	modBuf := fmt.Sprintf(`module bsontagtemp
 
-	go 1.13
-	
-	require (
-		git.dustess.com/mk-%v/%v latest
-		git.dustess.com/mk-base/pkg v1.0.8-0.20210312022455-297123de89af
-	)
-	
-	
-	replace git.dustess.com/mk-%v/%v => %v/src/%v
-	replace git.dustess.com/mk-base/pkg => %v/src/pkg
-	`, gitGroup, modName, gitGroup, modName, getGoPath(), modName, getGoPath())
+	// go 1.13
 
-	ioutil.WriteFile(workDir+"/go.mod", []byte(modBuf), 0644)
+	// require (
+	// 	git.dustess.com/mk-%v/%v latest
+	// 	git.dustess.com/mk-base/pkg v1.0.8-0.20210312022455-297123de89af
+	// )
+
+	// replace git.dustess.com/mk-%v/%v => %v/src/%v
+	// replace git.dustess.com/mk-base/pkg => %v/src/pkg
+	// `, gitGroup, modName, gitGroup, modName, getGoPath(), modName, getGoPath())
+
+	// ioutil.WriteFile(workDir+"/go.mod", []byte(modBuf), 0644)
 	// os.RemoveAll("./temp2")
 	// os.MkdirAll("./temp2", 0644)
 
@@ -244,8 +284,8 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 	// gopath = strings.Replace(gopath, "\\", "\\\\", -1)
 	fileDir := getGoPath() + "/src/" + pkgDir + "/auto_tag.go"
 	fileBuf = strings.Replace(fileBuf, "FILE-DIR", fileDir, -1)
-	os.MkdirAll(workDir+"/"+pkgDir, 0644)
-	if err := ioutil.WriteFile(workDir+"/"+pkgDir+"/main.go", []byte(fileBuf), 0644); err != nil {
+	os.MkdirAll(workDir+"/"+pkgDir, 0777)
+	if err := ioutil.WriteFile(workDir+"/"+pkgDir+"/main.go", []byte(fileBuf), 0777); err != nil {
 		fmt.Println(workDir+"/"+pkgDir+"/main.go写入失败, err = ", err)
 	} else {
 		fmt.Println(workDir + "/" + pkgDir + "/main.go成功写入")
@@ -337,7 +377,55 @@ func parseTabs(parent string) []packInfo {
 	return pInfo
 }
 
+func getDeptInfo(path string) map[string]string {
+	depts := []string{
+		"git.dustess.com/mk-base/pkg",
+	}
+
+	cmd := exec.Command("go", "list", "-m", "all")
+	// cmd.Dir = getGoPath() + "/src/" + path
+	cmd.Dir, _ = os.Getwd()
+	var stdout, stderr strings.Builder
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		panic(err)
+	}
+
+	outStr, _ := stdout.String(), stderr.String()
+
+	if outStr[0] == '_' { // will shown like _/{GOPATH}/src/{YOUR_PACKAGE} when NOT enable GO MODULE.
+		outStr = strings.TrimPrefix(outStr, "_"+build.Default.GOPATH+"/src/")
+	}
+	lines := strings.Split(outStr, "\n")
+	m := make(map[string]string)
+	for i := 1; i < len(lines); i++ {
+		temps := strings.Split(lines[i], " ")
+		m[temps[0]] = temps[len(temps)-1]
+	}
+
+	ret := make(map[string]string)
+	for _, dept := range depts {
+		if temp := m[dept]; temp != "" {
+			ret[dept] = temp
+		}
+	}
+
+	// 计算自己
+	curDir, _ := os.Getwd()
+	curDir = strings.ReplaceAll(curDir, "\\", "/")
+	flag := lines[0]
+	//	temps := strings.Split(curDir, flag)
+	real := strings.Split(flag, "/")
+	realPath := strings.Split(curDir, real[len(real)-1])
+	ret[flag] = realPath[0] + real[len(real)-1]
+
+	return ret
+}
+
 func env(dir string) string {
+
 	workDir, _ := os.Getwd()
 	if dir != "" {
 		workDir = workDir + "/" + dir
@@ -377,6 +465,8 @@ func main() {
 	dir := flag.String("d", "", "请输入pkg目录，例如mk-pay-svc/pkg、 ./pkg")
 	flag.Parse()
 	pkg := env(*dir)
+	// pkg = "mk-pay-svc/pkg"
+	//	getDeptInfo(pkg)
 	if pkg == "" {
 		return
 	}
@@ -402,7 +492,8 @@ func main() {
 	// 自动生成源码
 	workDir := getGoPath() + "/src/bsontagtemp"
 	os.RemoveAll(workDir)
-	os.MkdirAll(workDir, 0644)
+	os.MkdirAll(workDir, 0777)
+	writeModFile(pkg)
 
 	var mainFiles []string
 	for _, v := range pInfo {
