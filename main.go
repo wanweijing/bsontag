@@ -223,7 +223,7 @@ func autoGenCode(pkgDir string, pkgName string, tabs []string) string {
 			}
 	
 			for _, tag2 := range tags[i+1:] {
-				if tag1.fieldName == tag2.fieldName {
+				if tag1.tagName == tag2.tagName && len(tag1.subField) == 0 && len(tag2.subField) == 0 {
 					fmt.Printf("检测到冲突, field name = %v, tag name = %v\n", tag1.fieldName, tag1.tagName)
 					return false
 				}
